@@ -90,3 +90,8 @@ async def on_guild_channel_delete(channel):
         await logs.send(f"⚠️ Kanaal verwijderd: {channel.name}")
 
 bot.run(os.getenv("TOKEN"))
+
+@bot.event
+async def on_ready():
+    await bot.tree.sync()  # <---- VERPLICHT voor slash commands
+    print(f"Bot online als {bot.user}")
