@@ -144,8 +144,8 @@ async def on_guild_channel_delete(channel):
 )
 @app_commands.guilds(discord.Object(id=GUILD_ID))
 async def verifysetup(interaction: discord.Interaction):
-    website_verify_url = "https://JOUW-WEBSITE-URL"  # vul in of None
-    view = VerifyView(use_website=True, website_url=website_verify_url)
+    # 🔹 FIX: geen externe website knop
+    view = VerifyView(use_website=False)
 
     embed = discord.Embed(
         title="📋 Server Regels & Verificatie",
