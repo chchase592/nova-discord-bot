@@ -6,14 +6,19 @@ import os
 
 # ===================== CONFIG =====================
 
-GUILD_ID = 1437438257972379870
+GUILD_ID = 1437438257972379870  # <-- JOUW SERVER ID
 VERIFY_ROLE_NAME = "Inwoner"
 
+# 🔽 ECHTE CHANNEL ID'S
 MONITORING_CHANNEL_ID = 1445758222408614049
 VERIFY_LOG_CHANNEL_ID = 1445605544017531072
 ANTI_NUKE_CHANNEL_ID = 1445772067877294211
 JOIN_LOG_CHANNEL_ID = 1445606304138792980
 LEAVE_LOG_CHANNEL_ID = 1445606375102349312
+
+# Optioneel: minimum account leeftijd (dagen)
+MIN_ACCOUNT_AGE_DAYS = 7
+ENABLE_MIN_AGE_CHECK = True
 
 # ===================== INTENTS =====================
 
@@ -26,8 +31,17 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # ===================== VERIFY VIEW =====================
 
 class VerifyView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, use_website=False, website_url=None):
         super().__init__(timeout=None)
+        self.use_website = use_website
+        self.website_url = website_url
+
+        if self.use_website and self.website_url:
+            self.add_item(discord.ui.Button(
+                label="Klik hier om te verifiëren via website",
+                url=self.website_url,
+                style=discord.ButtonStyle.link
+            ))
 
     @discord.ui.button(
         label="Klik Hier Om je Rollen te ontvangen",
@@ -37,31 +51,74 @@ class VerifyView(discord.ui.View):
     async def verify(self, interaction: discord.Interaction, button: discord.ui.Button):
 
         role = discord.utils.get(interaction.guild.roles, name=VERIFY_ROLE_NAME)
-        log_channel = bot.get_channel(VERIFY_LOG_CHANNEL_ID)
+        log_channel = interaction.guild.get_channel(VERIFY_LOG_CHANNEL_ID)
 
         if not role:
-            await interaction.response.send_message("❌ Rol niet gevonden.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Verificatie mislukt: rol niet gevonden.",
+                ephemeral=True
+            )
             return
 
+        # Minimum account leeftijd check
+        if ENABLE_MIN_AGE_CHECK:
+            now = datetime.now(timezone.utc)
+            account_age_days = (now - interaction.user.created_at).days
+            if account_age_days < MIN_ACCOUNT_AGE_DAYS:
+                await interaction.response.send_message(
+                    f"⚠️ Je account is te jong ({account_age_days} dagen). "
+                    "Je kunt nog niet verifiëren.",
+                    ephemeral=True
+                )
+                return
+        else:
+            now = datetime.now(timezone.utc)
+            account_age_days = (now - interaction.user.created_at).days
+
         if role in interaction.user.roles:
-            await interaction.response.send_message("ℹ️ Je bent al geverifieerd.", ephemeral=True)
+            await interaction.response.send_message(
+                "ℹ️ Je bent al geverifieerd.",
+                ephemeral=True
+            )
             return
 
         await interaction.user.add_roles(role)
-        await interaction.response.send_message("✅ Je bent nu geverifieerd!", ephemeral=True)
+        await interaction.response.send_message(
+            "✅ **Verificatie voltooid!** Je hebt nu toegang.",
+            ephemeral=True
+        )
 
-        now = datetime.now(timezone.utc)
-        account_age = (now - interaction.user.created_at).days
-
+        # ------------------- SECURITY LOG -------------------
         embed = discord.Embed(
             title="✅ Verificatie Voltooid",
             color=discord.Color.green(),
             timestamp=now
         )
 
-        embed.add_field(name="👤 Gebruiker", value=f"{interaction.user}\n{interaction.user.id}", inline=False)
-        embed.add_field(name="📅 Account Leeftijd", value=f"{account_age} dagen", inline=False)
-        embed.add_field(name="🛡️ Status", value="Goedgekeurd", inline=False)
+        embed.add_field(
+            name="👤 Gebruiker",
+            value=f"{interaction.user}\n{interaction.user.id}",
+            inline=False
+        )
+
+        embed.add_field(
+            name="📅 Account Leeftijd",
+            value=f"{account_age_days} dagen",
+            inline=False
+        )
+
+        embed.add_field(
+            name="🏷️ Rol Toegekend",
+            value=VERIFY_ROLE_NAME,
+            inline=False
+        )
+
+        embed.add_field(
+            name="🛡️ Status",
+            value="Goedgekeurd",
+            inline=False
+        )
+
         embed.set_footer(text="Nova District • Security System")
 
         if log_channel:
@@ -73,7 +130,8 @@ class VerifyView(discord.ui.View):
 async def on_ready():
     await bot.tree.sync(guild=discord.Object(id=GUILD_ID))
     bot.add_view(VerifyView())
-    print(f"Bot online als {bot.user}")
+
+    print(f"🟢 Bot online als {bot.user}")
 
     monitoring = bot.get_channel(MONITORING_CHANNEL_ID)
     if monitoring:
@@ -95,13 +153,23 @@ async def on_member_remove(member):
 async def on_guild_channel_delete(channel):
     log_channel = channel.guild.get_channel(ANTI_NUKE_CHANNEL_ID)
     if log_channel:
-        await log_channel.send(f"⚠️ Kanaal verwijderd: **{channel.name}**")
+        await log_channel.send(
+            f"⚠️ Kanaal verwijderd: **{channel.name}**"
+        )
 
-# ===================== SLASH COMMANDS =====================
+# ===================== SLASH COMMAND =====================
 
-@bot.tree.command(name="verifysetup", description="Plaats het verificatiebericht")
+@bot.tree.command(
+    name="verifysetup",
+    description="Plaats het verificatiebericht"
+)
 @app_commands.guilds(discord.Object(id=GUILD_ID))
+@app_commands.checks.has_permissions(administrator=True)
 async def verifysetup(interaction: discord.Interaction):
+
+    # Optioneel: voeg externe website link toe als verify
+    website_verify_url = "https://JOUW-WEBSITE-URL"  # vul dit in of laat None
+    view = VerifyView(use_website=True, website_url=website_verify_url)
 
     embed = discord.Embed(
         title="📋 Server Regels & Verificatie",
@@ -109,36 +177,23 @@ async def verifysetup(interaction: discord.Interaction):
             "**Welkom bij Nova District! 🎮**\n\n"
             "📜 **Serverregels:**\n"
             "1️⃣ Respecteer alle leden en staff\n"
-            "2️⃣ Geen spam of reclame\n"
-            "3️⃣ Geen NSFW\n"
-            "4️⃣ Geen discriminatie\n"
+            "2️⃣ Geen spam, reclame of zelfpromotie\n"
+            "3️⃣ Geen NSFW content\n"
+            "4️⃣ Geen discriminatie of haatdragende taal\n"
             "5️⃣ Luister naar staff\n"
-            "6️⃣ Geen alts / ban evasion\n"
-            "7️⃣ Juiste kanalen gebruiken\n\n"
-            "🔐 **Klik op de knop hieronder om je rollen te ontvangen.**"
+            "6️⃣ Geen alts of ban evasion\n"
+            "7️⃣ Houd discussies in de juiste kanalen\n\n"
+            "🔐 **Klik op de knop hieronder om je rollen te ontvangen.**\n"
+            "Door te verifiëren ga je akkoord met onze regels."
         ),
         color=discord.Color.green()
     )
 
-    await interaction.channel.send(embed=embed, view=VerifyView())
-    await interaction.response.send_message("✅ Verificatie geplaatst.", ephemeral=True)
-
-@bot.tree.command(name="discordlinks", description="Toon belangrijke Discord links")
-@app_commands.guilds(discord.Object(id=GUILD_ID))
-async def discordlinks(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="🌐 Nova District • Belangrijke Discords",
-        color=discord.Color.blurple(),
-        timestamp=datetime.now(timezone.utc)
+    await interaction.channel.send(embed=embed, view=view)
+    await interaction.response.send_message(
+        "✅ Verificatiebericht geplaatst!",
+        ephemeral=True
     )
-
-    embed.add_field(name="💬 Support Discord", value="[Join hier](https://discord.gg/66UMrE8psM)", inline=False)
-    embed.add_field(name="🏛️ Overheid Discord", value="[Join hier](https://discord.gg/QBkYEfQDkV)", inline=False)
-    embed.add_field(name="🕵️ Onderwereld Discord", value="[Join hier](https://discord.gg/nZHCH68QvG)", inline=False)
-    embed.set_footer(text="Nova District • Discord Links")
-
-    await interaction.channel.send(embed=embed)
-    await interaction.response.send_message("✅ Discord links geplaatst!", ephemeral=True)
 
 # ===================== START BOT =====================
 
