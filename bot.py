@@ -11,21 +11,15 @@ ANTI_NUKE_CHANNEL = "discord-anti-nuke"
 JOIN_LOG_CHANNEL = "discord-join-logs"
 LEAVE_LOG_CHANNEL = "discord-leave-logs"
 
+GUILD_ID = 1437438257972379870  # jouw server ID
+
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-@bot.event
-async def on_ready():
-    await bot.tree.sync()
-    print(f"Bot online als {bot.user}")
-
-    monitoring = discord.utils.get(bot.get_all_channels(), name=MONITORING_CHANNEL)
-    if monitoring:
-        await monitoring.send("🟢 Bot is succesvol opgestart")
-
+# -------------------- VERIFY VIEW --------------------
 class VerifyView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -38,42 +32,40 @@ class VerifyView(discord.ui.View):
         role = discord.utils.get(interaction.guild.roles, name=VERIFY_ROLE_NAME)
         logs = discord.utils.get(interaction.guild.text_channels, name=VERIFY_LOG_CHANNEL)
 
+        if not role:
+            await interaction.response.send_message(
+                "❌ Rol niet gevonden. Contacteer staff.",
+                ephemeral=True
+            )
+            return
+
         if role in interaction.user.roles:
-            await interaction.response.send_message("Je hebt deze rol al.", ephemeral=True)
+            await interaction.response.send_message(
+                "ℹ️ Je hebt deze rol al.",
+                ephemeral=True
+            )
             return
 
         await interaction.user.add_roles(role)
-        await interaction.response.send_message("🎉 Je bent nu inwoner!", ephemeral=True)
+        await interaction.response.send_message(
+            "🎉 Je bent nu **Inwoner**!",
+            ephemeral=True
+        )
 
         if logs:
-            await logs.send(f"✅ {interaction.user} kreeg rol Inwoner")
+            await logs.send(f"✅ {interaction.user} kreeg rol **Inwoner**")
 
-GUILD_ID = 1437438257972379870  # <-- jouw server ID 
+# -------------------- EVENTS --------------------
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    bot.add_view(VerifyView())
 
-@bot.tree.command(name="verifysetup", description="Plaats het verificatiebericht")
-@app_commands.guilds(discord.Object(id=GUILD_ID))
+    print(f"🟢 Bot online als {bot.user}")
 
-@app_commands.checks.has_permissions(administrator=True)
-async def verifysetup(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="📋 Server Regels & Verificatie",
-        description=(
-            "**Welkom bij Nova District! 🎮**\n\n"
-            "📜 Regels:\n"
-            "1️⃣ Respecteer iedereen\n"
-            "2️⃣ Geen spam\n"
-            "3️⃣ Geen NSFW\n"
-            "4️⃣ Geen discriminatie\n"
-            "5️⃣ Luister naar staff\n"
-            "6️⃣ Geen alts\n"
-            "7️⃣ Gebruik juiste kanalen\n\n"
-            "**Klik op de knop hieronder om je rollen te ontvangen.**"
-        ),
-        color=discord.Color.green()
-    )
-
-    await interaction.channel.send(embed=embed, view=VerifyView())
-    await interaction.response.send_message("Verificatie geplaatst", ephemeral=True)
+    monitoring = discord.utils.get(bot.get_all_channels(), name=MONITORING_CHANNEL)
+    if monitoring:
+        await monitoring.send("🟢 Bot is succesvol opgestart")
 
 @bot.event
 async def on_member_join(member):
@@ -93,9 +85,36 @@ async def on_guild_channel_delete(channel):
     if logs:
         await logs.send(f"⚠️ Kanaal verwijderd: {channel.name}")
 
-bot.run(os.getenv("TOKEN"))
+# -------------------- SLASH COMMAND --------------------
+@bot.tree.command(
+    name="verifysetup",
+    description="Plaats het verificatiebericht"
+)
+@app_commands.guilds(discord.Object(id=GUILD_ID))
+@app_commands.checks.has_permissions(administrator=True)
+async def verifysetup(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📋 Server Regels & Verificatie",
+        description=(
+            "**Welkom bij Nova District! 🎮**\n\n"
+            "📜 **Serverregels:**\n"
+            "1️⃣ Respecteer alle leden en staff\n"
+            "2️⃣ Geen spam of reclame\n"
+            "3️⃣ Geen NSFW content\n"
+            "4️⃣ Geen discriminatie of haat\n"
+            "5️⃣ Luister naar staff\n"
+            "6️⃣ Geen alts of ban evasion\n"
+            "7️⃣ Gebruik de juiste kanalen\n\n"
+            "🔐 **Klik op de knop hieronder om je rollen te ontvangen.**"
+        ),
+        color=discord.Color.green()
+    )
 
-@bot.event
-async def on_ready():
-    await bot.tree.sync()  # <---- VERPLICHT voor slash commands
-    print(f"Bot online als {bot.user}")
+    await interaction.channel.send(embed=embed, view=VerifyView())
+    await interaction.response.send_message(
+        "✅ Verificatiebericht geplaatst!",
+        ephemeral=True
+    )
+
+# -------------------- RUN --------------------
+bot.run(os.getenv("TOKEN"))
