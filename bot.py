@@ -1,22 +1,22 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+from datetime import datetime, timezone
 import os
 
-# ================== CONFIG ==================
+# ===================== CONFIG =====================
 
-GUILD_ID = 1437438257972379870  # SERVER ID
-
+GUILD_ID = 1437438257972379870  # <-- JOUW SERVER ID
 VERIFY_ROLE_NAME = "Inwoner"
 
-# 🔽 ZET HIER JE ECHTE CHANNEL ID'S
+# 🔽 ECHTE CHANNEL ID'S
 MONITORING_CHANNEL_ID = 1445758222408614049
 VERIFY_LOG_CHANNEL_ID = 1445605544017531072
 ANTI_NUKE_CHANNEL_ID = 1445772067877294211
 JOIN_LOG_CHANNEL_ID = 1445606304138792980
 LEAVE_LOG_CHANNEL_ID = 1445606375102349312
 
-# ================== INTENTS ==================
+# ===================== INTENTS =====================
 
 intents = discord.Intents.default()
 intents.members = True
@@ -24,7 +24,7 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ================== VERIFY VIEW ==================
+# ===================== VERIFY VIEW =====================
 
 class VerifyView(discord.ui.View):
     def __init__(self):
@@ -36,35 +36,70 @@ class VerifyView(discord.ui.View):
         custom_id="verify_button"
     )
     async def verify(self, interaction: discord.Interaction, button: discord.ui.Button):
+
         role = discord.utils.get(interaction.guild.roles, name=VERIFY_ROLE_NAME)
         log_channel = interaction.guild.get_channel(VERIFY_LOG_CHANNEL_ID)
 
         if not role:
             await interaction.response.send_message(
-                "❌ Rol **Inwoner** bestaat niet.",
+                "❌ Verificatie mislukt: rol niet gevonden.",
                 ephemeral=True
             )
             return
 
         if role in interaction.user.roles:
             await interaction.response.send_message(
-                "ℹ️ Je hebt deze rol al.",
+                "ℹ️ Je bent al geverifieerd.",
                 ephemeral=True
             )
             return
 
         await interaction.user.add_roles(role)
         await interaction.response.send_message(
-            "🎉 Je bent nu **Inwoner**!",
+            "✅ **Verificatie voltooid!** Je hebt nu toegang.",
             ephemeral=True
         )
 
-        if log_channel:
-            await log_channel.send(
-                f"✅ **{interaction.user}** kreeg de rol **Inwoner**"
-            )
+        # ---------- SECURITY VERIFY LOG ----------
+        now = datetime.now(timezone.utc)
+        account_age_days = (now - interaction.user.created_at).days
 
-# ================== EVENTS ==================
+        embed = discord.Embed(
+            title="✅ Verificatie Voltooid",
+            color=discord.Color.green(),
+            timestamp=now
+        )
+
+        embed.add_field(
+            name="👤 Gebruiker",
+            value=f"{interaction.user}\n{interaction.user.id}",
+            inline=False
+        )
+
+        embed.add_field(
+            name="📅 Account Leeftijd",
+            value=f"{account_age_days} dagen",
+            inline=False
+        )
+
+        embed.add_field(
+            name="🏷️ Rol",
+            value=VERIFY_ROLE_NAME,
+            inline=False
+        )
+
+        embed.add_field(
+            name="🛡️ Status",
+            value="Goedgekeurd",
+            inline=False
+        )
+
+        embed.set_footer(text="Nova District • Security System")
+
+        if log_channel:
+            await log_channel.send(embed=embed)
+
+# ===================== EVENTS =====================
 
 @bot.event
 async def on_ready():
@@ -97,7 +132,7 @@ async def on_guild_channel_delete(channel):
             f"⚠️ Kanaal verwijderd: **{channel.name}**"
         )
 
-# ================== SLASH COMMAND ==================
+# ===================== SLASH COMMAND =====================
 
 @bot.tree.command(
     name="verifysetup",
@@ -131,6 +166,6 @@ async def verifysetup(interaction: discord.Interaction):
         ephemeral=True
     )
 
-# ================== START ==================
+# ===================== START =====================
 
 bot.run(os.getenv("TOKEN"))
