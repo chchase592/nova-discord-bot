@@ -37,7 +37,7 @@ class VerifyView(discord.ui.View):
     async def verify(self, interaction: discord.Interaction, button: discord.ui.Button):
 
         role = discord.utils.get(interaction.guild.roles, name=VERIFY_ROLE_NAME)
-        log_channel = interaction.guild.get_channel(VERIFY_LOG_CHANNEL_ID)
+        log_channel = bot.get_channel(VERIFY_LOG_CHANNEL_ID)
 
         if not role:
             await interaction.response.send_message("❌ Rol niet gevonden.", ephemeral=True)
@@ -59,24 +59,9 @@ class VerifyView(discord.ui.View):
             timestamp=now
         )
 
-        embed.add_field(
-            name="👤 Gebruiker",
-            value=f"{interaction.user}\n{interaction.user.id}",
-            inline=False
-        )
-
-        embed.add_field(
-            name="📅 Account Leeftijd",
-            value=f"{account_age} dagen",
-            inline=False
-        )
-
-        embed.add_field(
-            name="🛡️ Status",
-            value="Goedgekeurd",
-            inline=False
-        )
-
+        embed.add_field(name="👤 Gebruiker", value=f"{interaction.user}\n{interaction.user.id}", inline=False)
+        embed.add_field(name="📅 Account Leeftijd", value=f"{account_age} dagen", inline=False)
+        embed.add_field(name="🛡️ Status", value="Goedgekeurd", inline=False)
         embed.set_footer(text="Nova District • Security System")
 
         if log_channel:
@@ -88,7 +73,7 @@ class VerifyView(discord.ui.View):
 async def on_ready():
     await bot.tree.sync(guild=discord.Object(id=GUILD_ID))
     bot.add_view(VerifyView())
-    print(f"🟢 Bot online als {bot.user}")
+    print(f"Bot online als {bot.user}")
 
     monitoring = bot.get_channel(MONITORING_CHANNEL_ID)
     if monitoring:
@@ -114,12 +99,8 @@ async def on_guild_channel_delete(channel):
 
 # ===================== SLASH COMMANDS =====================
 
-@bot.tree.command(
-    name="verifysetup",
-    description="Plaats het verificatiebericht"
-)
+@bot.tree.command(name="verifysetup", description="Plaats het verificatiebericht")
 @app_commands.guilds(discord.Object(id=GUILD_ID))
-@app_commands.checks.has_permissions(administrator=True)
 async def verifysetup(interaction: discord.Interaction):
 
     embed = discord.Embed(
@@ -142,63 +123,8 @@ async def verifysetup(interaction: discord.Interaction):
     await interaction.channel.send(embed=embed, view=VerifyView())
     await interaction.response.send_message("✅ Verificatie geplaatst.", ephemeral=True)
 
-# ===================== SERVER STATUS COMMAND =====================
-
-@bot.tree.command(
-    name="serverstatus",
-    description="Plaats status van externe servers met links"
-)
+@bot.tree.command(name="discordlinks", description="Toon belangrijke Discord links")
 @app_commands.guilds(discord.Object(id=GUILD_ID))
-@app_commands.checks.has_permissions(administrator=True)
-async def serverstatus(
-    interaction: discord.Interaction,
-    server1_name: str,
-    server1_status: str,
-    server1_link: str = None,
-    server2_name: str = None,
-    server2_status: str = None,
-    server2_link: str = None,
-    server3_name: str = None,
-    server3_status: str = None,
-    server3_link: str = None,
-):
-    def format_status(name, status, link):
-        emoji_map = {
-            "online": "🟢",
-            "offline": "🔴",
-            "onderhoud": "🟠"
-        }
-        emoji = emoji_map.get(status.lower(), "🟠")
-        display = f"{emoji} {name}"
-        if link:
-            display = f"[{display}]({link})"
-        return display
-
-    embed = discord.Embed(
-        title="🌐 Nova District • Server Status",
-        color=discord.Color.blurple(),
-        timestamp=datetime.now(timezone.utc)
-    )
-
-    embed.add_field(name=format_status(server1_name, server1_status, server1_link), value="Status weergegeven", inline=False)
-    if server2_name and server2_status:
-        embed.add_field(name=format_status(server2_name, server2_status, server2_link), value="Status weergegeven", inline=False)
-    if server3_name and server3_status:
-        embed.add_field(name=format_status(server3_name, server3_status, server3_link), value="Status weergegeven", inline=False)
-
-    embed.set_footer(text="Laatste update")
-
-    await interaction.channel.send(embed=embed)
-    await interaction.response.send_message("✅ Server status geplaatst.", ephemeral=True)
-
-# ===================== DISCORD LINKS COMMAND =====================
-
-@bot.tree.command(
-    name="discordlinks",
-    description="Toon belangrijke Discord links"
-)
-@app_commands.guilds(discord.Object(id=GUILD_ID))
-@app_commands.checks.has_permissions(administrator=True)
 async def discordlinks(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🌐 Nova District • Belangrijke Discords",
@@ -206,23 +132,11 @@ async def discordlinks(interaction: discord.Interaction):
         timestamp=datetime.now(timezone.utc)
     )
 
-    embed.add_field(
-        name="💬 Support Discord",
-        value="[Join hier](https://discord.gg/66UMrE8psM)",
-        inline=False
-    )
-    embed.add_field(
-        name="🏛️ Overheid Discord",
-        value="[Join hier](https://discord.gg/QBkYEfQDkV)",
-        inline=False
-    )
-    embed.add_field(
-        name="🕵️ Onderwereld Discord",
-        value="[Join hier](https://discord.gg/nZHCH68QvG)",
-        inline=False
-    )
-
+    embed.add_field(name="💬 Support Discord", value="[Join hier](https://discord.gg/66UMrE8psM)", inline=False)
+    embed.add_field(name="🏛️ Overheid Discord", value="[Join hier](https://discord.gg/QBkYEfQDkV)", inline=False)
+    embed.add_field(name="🕵️ Onderwereld Discord", value="[Join hier](https://discord.gg/nZHCH68QvG)", inline=False)
     embed.set_footer(text="Nova District • Discord Links")
+
     await interaction.channel.send(embed=embed)
     await interaction.response.send_message("✅ Discord links geplaatst!", ephemeral=True)
 
